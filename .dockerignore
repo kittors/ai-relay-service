@@ -1,0 +1,21 @@
+node_modules
+npm-debug.log
+.npmrc
+
+# Frontend build artifacts
+web/admin-spa/node_modules
+web/admin-spa/dist
+
+# Local runtime data
+logs
+data
+tmp
+
+# Git metadata
+.git
+.gitignore
+
+# IDE and editor settings
+.vscode
+.idea
+*.swp

@@ -1,0 +1,9 @@
+services:
+  app:
+    # Use image pushed by CI/CD. Default to Docker Hub prod tag.
+    # You can override with IMAGE env var in .env on the server.
+    # Default below targets Docker Hub with project-aligned name.
+    image: ${IMAGE:-docker.io/kittros/claude-relay-service:prod}
+    platform: linux/amd64
+    # Ensure we do not build on server; override/disable any build config from base file
+    build: null

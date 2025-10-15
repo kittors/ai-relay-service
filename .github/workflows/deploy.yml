@@ -1,0 +1,95 @@
+name: Build image (amd64) and deploy
+
+on:
+  push:
+    branches:
+      - prod
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: docker.io
+
+jobs:
+  build-and-push:
+    name: Build amd64 image and push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for cross-arch)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_IMAGE != '' && secrets.DOCKERHUB_IMAGE || format('docker.io/{0}/{1}', secrets.DOCKERHUB_USERNAME, github.event.repository.name) }}
+          tags: |
+            type=raw,value=prod
+            type=sha
+            type=ref,event=branch,branch=prod
+
+      - name: Build and push (linux/amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    name: Deploy on Debian server
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            if [ -z "${{ secrets.DEPLOY_PATH }}" ]; then echo "DEPLOY_PATH secret not set"; exit 1; fi
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            # Ensure repo is present and on prod branch (optional if you manage files otherwise)
+            if [ -d .git ]; then
+              git fetch --all --prune || true
+              git checkout prod || true
+              git pull || true
+            fi
+
+            # Optional: login for private images on Docker Hub; skip if secrets not provided
+            if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+              echo "Logging into Docker Hub..."
+              echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            else
+              echo "Skipping docker login (public image assumed)"
+            fi
+
+            # Pull and restart using production override
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+            # Cleanup old images
+            docker image prune -f || true

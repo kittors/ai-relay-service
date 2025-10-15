@@ -1,0 +1,30 @@
+const express = require('express')
+const router = express.Router()
+
+// Sub-routers (domain focused)
+router.use(require('./users'))
+router.use(require('./clients'))
+router.use(require('./apiKeyTemplates'))
+router.use(require('./apiKeys'))
+router.use(require('./accountGroups'))
+router.use(require('./accountsAggregated'))
+router.use(require('./dashboard'))
+router.use(require('./stats'))
+router.use(require('./claudeCode'))
+router.use(require('./oemSettings'))
+router.use(require('./productSettings'))
+router.use(require('./orders'))
+router.use(require('./system'))
+
+// Platform specific routers
+router.use(require('./claude'))
+router.use(require('./claudeConsole'))
+router.use(require('./ccr'))
+router.use(require('./bedrock'))
+router.use(require('./gemini'))
+router.use(require('./openai'))
+router.use(require('./azureOpenai'))
+router.use(require('./openaiResponses'))
+router.use(require('./droid'))
+
+module.exports = router

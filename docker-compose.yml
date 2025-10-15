@@ -1,0 +1,42 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-relay-service:latest
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - target: ${PORT:-3000}
+        published: ${PORT:-3000}
+        protocol: tcp
+    # 生产环境下不挂载 config 目录，避免覆盖镜像内模板文件
+    # 如需自定义配置，可直接在容器内生成的 /app/config/config.js 基础上调整，或显式挂载该文件
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  app-dev:
+    image: node:20-slim
+    working_dir: /app
+    entrypoint: ["./docker-entrypoint.sh"]
+    command: ["npm", "run", "dev"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    ports:
+      - target: ${PORT:-3000}
+        published: ${PORT:-3000}
+        protocol: tcp
+    profiles:
+      - dev
+
+volumes:
+  node_modules:
